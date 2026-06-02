@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "Mudhro Agency organization registration backend",
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
+    "postinstall": "npx puppeteer browsers install chrome",
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
@@ -30,7 +34,6 @@
     "nodemailer": "^6.9.16",
     "pdfkit": "^0.15.0",
     "pg": "^8.20.0",
-    "playwright": "^1.59.1",
     "puppeteer": "^25.1.0",
     "socket.io": "^4.8.3",
     "swagger-ui-express": "^5.0.1",

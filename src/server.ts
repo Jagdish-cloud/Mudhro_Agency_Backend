@@ -9,9 +9,9 @@ import { attachInternalChatSockets } from "./sockets/internalChat.socket.js";
 const server = http.createServer(app);
 attachInternalChatSockets(server);
 
-server.listen(env.PORT, () => {
+server.listen(env.PORT, "0.0.0.0", () => {
   // eslint-disable-next-line no-console
-  console.log(`Mudhro backend listening on http://localhost:${env.PORT}`);
+  console.log(`Mudhro backend listening on port ${env.PORT}`);
   startReminderScheduler();
   startChatRetentionScheduler();
 });

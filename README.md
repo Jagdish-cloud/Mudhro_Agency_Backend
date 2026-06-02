@@ -4,31 +4,60 @@ Node.js + Express + TypeScript backend for organization registration, admin sign
 
 ## Setup
 
+Requires **Node 20.19+** (see `.nvmrc`).
+
 1. Install dependencies:
-   - `npm install`
-2. Install Playwright’s Chromium build (required for invoice PDF generation):
-   - `npx playwright install chromium`
-   - In CI or Docker images, run the same command (or `npx playwright install --with-deps chromium` where system libraries are needed).
-3. Configure environment:
+   - `npm install` (runs `postinstall` → installs Puppeteer Chrome for PDF generation)
+2. Configure environment:
    - copy `.env.example` to `.env`
-4. Run database migrations (in order):
+3. Run database migrations (in order, against your PostgreSQL database):
    - `sql/001_init_organization_registration.sql`
    - `sql/002_admin_email_globally_unique.sql`
-   - `sql/003_add_role_to_organization_admins.sql` — adds `role`, `status`, `deleted_at`
-   - `sql/004_add_organization_branding.sql` — adds seller `state_code`, `gst_number`, `logo_path`
-   - `sql/005_agency_clients.sql` — agency clients table
-   - `sql/006_agency_invoices.sql` — invoices (enforces `client.organization_id = invoice.organization_id`)
-   - `sql/007_agency_invoice_items.sql` — line items (HSN required)
+   - `sql/003_add_role_to_organization_admins.sql`
+   - `sql/004_add_organization_branding.sql`
+   - `sql/005_agency_clients.sql`
+   - `sql/006_agency_invoices.sql`
+   - `sql/007_agency_invoice_items.sql`
    - `sql/008_agency_invoice_installments.sql`
    - `sql/009_agency_invoice_payments.sql`
    - `sql/010_agency_invoice_reminders.sql`
    - `sql/011_agency_attachments_and_notifications.sql`
-   - `sql/012_agency_invoice_sequences.sql` — per-org/per-year invoice number allocator
-   - `sql/013_agency_client_items.sql` — per-client line-item catalog (reusable invoice rows, members can CRUD)
-5. Start the API:
+   - `sql/012_agency_invoice_sequences.sql`
+   - `sql/013_agency_client_items.sql`
+   - `sql/014_agency_invoices_inclusive_tax.sql`
+   - `sql/015_agency_invoices_reminders_flag.sql`
+   - `sql/016_agency_projects.sql`
+   - `sql/017_agency_project_clients.sql`
+   - `sql/018_agency_agreements.sql`
+   - `sql/019_agency_blob_files.sql`
+   - `sql/020_agreement_blob_refactor.sql`
+   - `sql/021_agency_invoice_payment_deductions.sql`
+   - `sql/022_reconcile_invoice_pending_deductions.sql`
+   - `sql/023_agency_expenses.sql`
+   - `sql/024_agency_vendors.sql`
+   - `sql/025_internal_chat.sql`
+   - `sql/026_invoice_reminder_offsets.sql`
+4. Start the API:
    - `npm run dev`
-6. Run tests:
+5. Run tests:
    - `npm test`
+
+## Deploy to Azure App Service (Linux, Node 20)
+
+Repository: `https://github.com/Jagdish-cloud/Mudhro_Agency_Backend.git` (branch `main`).
+
+Oryx: `npm install` → `npm run build` → `npm start` (`node dist/server.js` on `0.0.0.0:$PORT`).
+
+| Doc | Purpose |
+|-----|---------|
+| [docs/AZURE_PORTAL_CHECKLIST.md](docs/AZURE_PORTAL_CHECKLIST.md) | Portal steps (Web App, PostgreSQL, Blob, Deployment Center) |
+| [docs/AZURE_ENV_REFERENCE.md](docs/AZURE_ENV_REFERENCE.md) | **All** backend + frontend environment variables |
+
+**Cross-app URLs:** set frontend `VITE_API_BASE_URL` to this API’s URL (redeploy frontend). Set backend `APP_PUBLIC_URL` and `SOCKET_CORS_ORIGIN` to the frontend URL.
+
+**Invoice attachments:** `UPLOAD_DIR` is local disk — on App Service use mounted Azure Files (e.g. `/home/uploads`) or files are lost on restart.
+
+**PDF:** uses Puppeteer (Chrome installed via `postinstall` on deploy).
 
 ## Role mapping
 
@@ -197,13 +226,16 @@ Everything in this module is mounted under `/api/organizations/:orgId/*` and is
 protected by `requireAuth` + `requireSameOrg`. Destructive and "send" operations
 additionally require `requireOrgAdmin`.
 
-### Environment (see `.env.example`)
+### Environment (see `.env.example` and `docs/AZURE_ENV_REFERENCE.md`)
 
 | Variable | Purpose |
 |----------|---------|
 | `APP_PUBLIC_URL`         | Base URL used in invoice emails & client portal links. |
+| `SOCKET_CORS_ORIGIN`     | Allowed origin(s) for Socket.IO chat (frontend URL in production). |
+| `AZURE_STORAGE_CONNECTION_STRING` | Blob storage for agreements, chat, and file uploads. |
 | `ENABLE_SCHEDULER`       | `true` to boot the node-cron reminder dispatcher + overdue recompute. |
-| `UPLOAD_DIR`             | Root folder for attachments (multer writes to `uploads/orgs/:orgId/invoices/:invoiceId/`). |
+| `SCHEDULER_SECRET`       | Secret for `POST /api/internal/jobs/reminder-tick` (Azure Timer). |
+| `UPLOAD_DIR`             | Root folder for invoice attachments (local disk; use persistent mount on Azure). |
 | `INVOICE_NUMBER_PREFIX`  | Prefix for allocated invoice numbers. Default `INV`. |
 | `INVOICE_NUMBER_PAD`     | Zero-pad width for the per-org/per-year sequence. Default `5`. |
 | `SMTP_HOST` + `SMTP_PORT` + `SMTP_SECURE` + `SMTP_USER` + `SMTP_PASS` + `SMTP_FROM` + `SMTP_FROM_NAME` | Nodemailer transport. If `SMTP_HOST` is empty, mail is **logged to stdout** in dev and returns success. |
